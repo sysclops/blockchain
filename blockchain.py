@@ -1,386 +1,371 @@
-import hashlib
+from functools import reduce
+
 import json
-from flask import Flask, jsonify, request
-from uuid import uuid4
-from urlparse import urlparse
 import requests
-import time
-import urllib
-
-
-class Blockchain(object):
-	def __init__(self):
-		self.chain = []
-		self.current_transactions = []
-		self.nodes = set()
-		self.difficulty = 6
-		self.blocktime = 10
-		self.blockreward = 0.01
-		self.last_time = time.time()
-		# Creates the genesis block
-		self.new_block(previous_hash=1, proof=100)
-
-	def new_block(self, proof, previous_hash=None):
-		"""
-		Create a new Block in the Blockchain
-		:param proof: <int> The proof given by the Proof of Work algorithm
-		:param previous_hash: (Optional) <str> Hash of previous Block
-		:return: <dict> New Block
-		"""
-
-		block = {
-			'index': len(self.chain) + 1,
-			'timestamp': time.time(),
-			'transactions': self.current_transactions,
-			'proof': proof,
-			'previous_hash': previous_hash or self.hash(self.chain[-1]),
-		}
-
-		# Resets current list of transactions
-		self.current_transactions = []
-
-		self.chain.append(block)
-		return block
-
-	def new_transaction(self, sender, recipient, amount):
-		"""
-		Creates a new transaction to go into the next mined Block
-		:param sender: <str> Address of the Sender
-		:param recipient: <str> Address of the Recipient
-		:param amount: <int> Amount
-		:return: <int> The index of the Block that will hold this transaction
-		"""
-
-		self.current_transactions.append({
-			'sender': sender,
-			'recipient': recipient,
-			'amount': amount,
-		})
-
-		return self.last_block['index'] + 1	 # Returns the index of the block which the transaction will be added to
-
-	@staticmethod
-	def hash(block):
-		"""
-		Creates a SHA-256 hash of a Block
-		:param block: <dict> Block
-		:return: <str>
-		"""
-
-		# Need make sure that the dict is in order, or we'll have inconsistent hashes :(
-		block_string = json.dumps(block, sort_keys=True).encode()
-		return hashlib.sha256(block_string).hexdigest()
-
-	@property
-	def last_block(self):
-		# Returns the last Block in the chain
-		return self.chain[-1]
-
-	def proof_of_work(self, last_block):
-		"""
-		Simple Proof of Work Algorithm:
-		- Find a number p' such that hash(pp') contains leading 4 zeroes
-		- Where p is the previous proof, and p' is the new proof
-
-		:param last_block: <dict> last Block
-		:return: <int>
-		"""
-
-		last_proof = last_block['proof']
-		last_hash = self.hash(last_block)
-
-		proof = 0
-		while self.valid_proof(last_proof, proof, last_hash) is False:
-			proof += 1
-
-		return proof
-
-	@staticmethod
-	def valid_proof(last_proof, proof, last_hash):
-		"""
-		Validates the Proof: Does hash(last_proof, proof) (contains 4 leading zeroes)
-		:param last_proof: <int> Previous Proof
-		:param proof: <int> Current Proof
-		:param last_hash: <str> Hash of previous Block
-		:return: <bool> True if correct, False if not.
-		"""
-		mid_string = str(last_proof) + str(proof) + str(last_hash)
-		guess = mid_string.encode()
-		guess_hash = hashlib.sha256(guess).hexdigest()
-		return guess_hash[:4] == "0000"
-
-	def register_node(self, address):
-		"""
-		Add a new node to the list of nodes
-		:param address: Address of node. Eg. 'http://192.168.0.5:5000'
-		"""
-
-		parsed_url = urlparse(address) # scheme://netloc/path;parameters?query#fragment00
-		if parsed_url.netloc:
-			self.nodes.add(parsed_url.netloc)
-		elif parsed_url.path:
-			# Accepts an URL without scheme like '192.168.0.5:5000'.
-			self.nodes.add(parsed_url.path)
-		else:
-			raise ValueError('Invalid URL')
-
-	def valid_chain(self, chain):
-		"""
-		Responsible for checking if a chain is valid by looping through each block and verifying both the hash and the proof.
-
-		Determine if a given blockchain is valid
-		:param chain: <list> A blockchain
-		:return: <bool> True if valid, False if not
-		"""
-
-		last_block = chain[0]
-		current_index = 1
-
-		while current_index < len(chain):
-			block = chain[current_index]
-			# Check that the hash of the block is correct
-			t = self.hash(last_block)
-			if block['previous_hash'] != t:
-				print("here " + current_index)
-				return False
-
-			x = self.valid_proof(last_block['proof'], block['proof'], block['previous_hash'])
-
-			# Check that the Proof of Work is correct
-			if not x:
-				print("here2 " + current_index)
-				return False
-
-			last_block = block
-			current_index += 1
-
-		return True
-
-	def resolve_conflicts(self):
-		"""
-		Consensus Algorithm, it resolves conflicts by replacing our chain with the longest one in the network.
-		Loops through all our neighbouring nodes, downloads their chains and verifies them using the above method.
-		If a valid chain is found, whose length is greater than ours, we replace ours.
-
-		:return: <bool> True if our chain was replaced, False if not
-		"""
-
-		neighbours = self.nodes
-		new_chain = None
-
-		# We're only looking for chains longer than ours
-		max_length = len(self.chain)
-
-		# Grab and verify the chains from all the nodes in our network
-		for node in neighbours:
-			y = urllib.request.urlopen('http://'+node+'/chain').read()
-			my_json = y.decode('utf8').replace("'", '"')
-			data = json.loads(my_json)
-			response = json.dumps(data)
-			length = data['length']
-			chain = data['chain']
-
-			print str(length) + "  " + str(max_length)
-
-			# Check if the length is longer and the chain is valid
-			if length > max_length and self.valid_chain(chain) and length == len(chain):
-				max_length = length
-				new_chain = chain
-
-			# Replace our chain if we discovered a new, valid chain longer than ours
-			if new_chain:
-				self.chain = new_chain
-				return True
-
-		return False
-
-	def getworkt(self):
-		last_block = blockchain.last_block
-		last_id = len(self.chain)+1
-		last_proof = last_block['proof']
-		last_hash = self.hash(last_block)
-		self.last_time = time.time()
-		return last_id, last_hash, last_proof
-
-
-# Instantiate our Node
-app = Flask(__name__)
-
-# Generate a globally unique address for this node
-node_identifier = str(uuid4()).replace('-', '')
-
-# Instantiate the Blockchain
-blockchain = Blockchain()
-
-
-@app.route("/")
-def hello():
-	return "Blockchaining :)"
-
-
-@app.route('/mine', methods=['GET'])
-def mine():
-	# Run the proof of work algorithm to get the next proof...
-	last_block = blockchain.last_block
-	proof = blockchain.proof_of_work(last_block)
-
-	# Sender is "0" to signify that this node has mined a new coin.
-	blockchain.new_transaction(
-		sender="0",
-		recipient=node_identifier,
-		amount=blockchain.blockreward,
-	)
-
-	# Forge the new Block by adding it to the chain
-	previous_hash = blockchain.hash(last_block)
-	block = blockchain.new_block(proof, previous_hash)
-
-	response = {
-		'message': "New Block Forged",
-		'index': block['index'],
-		'transactions': block['transactions'],
-		'proof': block['proof'],
-		'previous_hash': block['previous_hash'],
-	}
-	return jsonify(response), 200
-
-
-@app.route('/transactions/new', methods=['POST'])
-def new_transaction():
-	values = request.get_json()
-
-	# Check that the required fields are in the POST'ed data
-	required = ['sender', 'recipient', 'amount']
-
-	if not all(k in values for k in required):
-		return 'Missing values', 400
-
-	# Create a new Transaction
-	index = blockchain.new_transaction(values['sender'], values['recipient'], values['amount'])
-
-	response = {'message': 'Transaction will be added to Block ' + str(index)}
-	return jsonify(response), 201
-
-
-@app.route('/chain', methods=['GET'])
-def full_chain():
-	response = {
-		'chain': blockchain.chain,
-		'length': len(blockchain.chain),
-	}
-	return jsonify(response), 200
-
-
-@app.route('/nodes', methods=['GET'])
-def full_nodes():
-	nodes = [item for item in blockchain.nodes]
-	response = {
-		'nodes': nodes,
-		'length': len(nodes),
-	}
-	return jsonify(response), 200
-
-
-@app.route('/nodes/register', methods=['POST'])
-def register_nodes():
-	values = request.get_json()
-
-	nodes = values.get('nodes')
-	if nodes is None:
-		return "Error: Please supply a valid list of nodes", 400
-
-	for node in nodes:
-		blockchain.register_node(node)
-
-	response = {
-		'message': 'New nodes have been added',
-		'total_nodes': list(blockchain.nodes),
-	}
-	return jsonify(response), 201
-
-
-@app.route('/nodes/resolve', methods=['GET'])
-def consensus():
-	replaced = blockchain.resolve_conflicts
-
-	if replaced:
-		response = {
-			'message': 'Our chain was replaced',
-			'new_chain': blockchain.chain
-		}
-	else:
-		response = {
-			'message': 'Our chain is authoritative',
-			'chain': blockchain.chain
-		}
-
-	return jsonify(response), 200
-
-
-@app.route('/getwork', methods=['GET'])
-def getwork():
-	r = blockchain.getworkt()
-	response = {
-		'lastindex': r[0],
-		'lasthash': r[1],
-		'lastproof': r[2]
-	}
-
-	return jsonify(response), 200
-
-
-@app.route('/getwork/difficulty', methods=['GET'])
-def getDiff():
-	response = {
-		'difficulty': blockchain.difficulty,
-		'blockTime':blockchain.blocktime
-	}
-	return jsonify(response), 200
-
-
-@app.route('/setdiff', methods=['POST'])
-def setDiff():
-	values = request.get_json()
-	required = ['diff']
-	if not all(k in values for k in required):
-		return 'Missing values', 400
-	blockchain.difficulty = values['diff']
-	response = {
-		'Message': "Difficulty set to " + str(values['diff'])
-	}
-	return jsonify(response), 200
-
-
-@app.route('/submitwork', methods=['POST'])
-def submit():
-	values = request.get_json()
-	last_block = blockchain.last_block
-	# Checks that the required fields are in the POST'ed data
-	required = ['index', 'proof', 'address']
-	if not all(k in values for k in required):
-		return 'Missing values', 400
-
-	response = {}
-	# Forges the new Block by adding it to the chain
-	if values['index'] == len(blockchain.chain):
-		previous_hash = blockchain.hash(last_block)
-		block = blockchain.new_block(values['proof'], previous_hash)
-		blockchain.new_transaction(
-			sender="0",
-			recipient=values['address'],
-			amount=blockchain.blockreward,
-		)
-		response = {
-			'message': "New Block Forged",
-			'index': block['index'],
-			'transactions': block['transactions'],
-			'proof': block['proof'],
-			'previous_hash': block['previous_hash'],
-		}
-
-	return jsonify(response), 200
-
-
-if __name__ == '__main__':
-	app.run(host='0.0.0.0', port=5001)
 
+from utility.hashutility import hash_block
+from utility.verification import Verification
+from block import Block
+from transaction import Transaction
+from wallet import Wallet
+
+MINING_REWARD = 10
+
+print(__name__)
+
+
+class Blockchain:
+    """The Blockchain class manages the chain of blocks as well as open
+    transactions and the node on which it's running.
+
+    Attributes:
+        :chain: The list of blocks
+        :open_transactions (private): The list of open transactions
+        :hosting_node: The connected node (which runs the blockchain).
+    """
+
+    def __init__(self, public_key, node_id):
+        """The constructor of the Blockchain class."""
+        genesis_block = Block(0, '', [], 100, 0)
+        self.chain = [genesis_block]
+        self.__open_transactions = []
+        self.public_key = public_key
+        self.__peer_nodes = set()
+        self.node_id = node_id
+        self.resolve_conflicts = False
+        self.load_data()
+
+    # Turns the chain attribute into a property with a getter  and a setter (@chain.setter)
+    @property
+    def chain(self):
+        return self.__chain[:]
+
+    @chain.setter
+    def chain(self, val):
+        self.__chain = val
+
+    def get_open_transactions(self):
+        """Returns a copy of the open transactions list."""
+        return self.__open_transactions[:]
+
+    def load_data(self):
+        """Initialize blockchain + open transactions data from a file."""
+        try:
+            with open('blockchain-{}.txt'.format(self.node_id), mode='r') as f:
+                file_content = f.readlines()
+                blockchain = json.loads(file_content[0][:-1])
+                updated_blockchain = []
+                for block in blockchain:
+                    converted_transaction = [Transaction(
+                        transaction['sender'],
+                        transaction['recipient'],
+                        transaction['signature'],
+                        transaction['amount']) for transaction in block['transactions']]
+                    updated_block = Block(
+                        block['index'],
+                        block['previous_hash'],
+                        converted_transaction,
+                        block['proof'],
+                        block['timestamp'])
+                    updated_blockchain.append(updated_block)
+                self.chain = updated_blockchain
+                open_transactions = json.loads(file_content[1][:-1])
+                # We need to convert  the loaded data because Transactions
+                # should use OrderedDict
+                updated_transactions = []
+                for transaction in open_transactions:
+                    updated_transaction = Transaction(
+                        transaction['sender'],
+                        transaction['recipient'],
+                        transaction['signature'],
+                        transaction['amount'])
+                    updated_transactions.append(updated_transaction)
+                self.__open_transactions = updated_transactions
+                peer_nodes = json.loads(file_content[2])
+                self.__peer_nodes = set(peer_nodes)
+        except (IOError, IndexError):
+            pass
+        finally:
+            print('Cleanup!')
+
+    def save_data(self):
+        """Save blockchain + open transactions snapshot to a file."""
+        try:
+            with open('blockchain-{}.txt'.format(self.node_id), mode='w') as f:
+                saveable_chain = [
+                    block.__dict__ for block in
+                    [
+                        Block(block_el.index,
+                              block_el.previous_hash,
+                              [transaction.__dict__ for transaction in block_el.transactions],
+                              block_el.proof,
+                              block_el.timestamp) for block_el in self.__chain
+                    ]
+                ]
+                f.write(json.dumps(saveable_chain))
+                f.write('\n')
+                saveable_transaction = [transaction.__dict__ for transaction in self.__open_transactions]
+                f.write(json.dumps(saveable_transaction))
+                f.write('\n')
+                f.write(json.dumps(list(self.__peer_nodes)))
+                # save_data = {
+                #     'chain': blockchain,
+                #     'ot': open_transactions
+                # }
+                # f.write(pickle.dumps(save_data))
+        except IOError:
+            print('Saving failed!')
+
+    def proof_of_work(self):
+        """Generate a proof of work for the open transactions, the hash of the
+        previous block and a random number (which is guessed until it fits)."""
+        last_block = self.__chain[-1]
+        last_hash = hash_block(last_block)
+        proof = 0
+        # Try different PoW numbers and return the first valid one
+        while not Verification.valid_proof(
+            self.__open_transactions,
+            last_hash, proof
+        ):
+            proof += 1
+        return proof
+
+    def get_balance(self, sender=None):
+        """Calculate and return the balance for a participant.
+        """
+        if sender is None:
+            if self.public_key is None:
+                return None
+            participant = self.public_key
+        else:
+            participant = sender
+        # Fetch a list of all sent coin amounts for the given person (empty
+        # lists are returned if the person was NOT the sender)
+        # This fetches sent amounts of transactions that were already included
+        # in blocks of the blockchain
+        transaction_sender = [[transaction.amount for transaction in block.transactions
+                      if transaction.sender == participant] for block in self.__chain]
+        # Fetch a list of all sent coin amounts for the given person (empty
+        # lists are returned if the person was NOT the sender)
+        # This fetches sent amounts of open transactions (to avoid double
+        # spending)
+        open_transaction_sender = [
+            transaction.amount for transaction in self.__open_transactions
+            if transaction.sender == participant
+        ]
+        transaction_sender.append(open_transaction_sender)
+        print(transaction_sender)
+        amount_sent = reduce(lambda transaction_sum, transaction_amt: transaction_sum + sum(transaction_amt)
+                             if len(transaction_amt) > 0 else transaction_sum + 0, transaction_sender, 0)
+        # Fetch received coin amounts of transactions that were already
+        # included in blocks of the blockchain
+        # We ignore open transactions here because you shouldn't be able to
+        # spend coins before the transaction was confirmed + included in a
+        # block
+        transaction_recipient = [
+            [
+                transaction.amount for transaction in block.transactions
+                if transaction.recipient == participant
+            ] for block in self.__chain
+        ]
+        amount_received = reduce(
+            lambda transaction_sum, transaction_amt: transaction_sum + sum(transaction_amt)
+            if len(transaction_amt) > 0 else transaction_sum + 0,
+            transaction_recipient,
+            0
+        )
+        # Return the total balance
+        return amount_received - amount_sent
+
+    def get_last_blockchain_value(self):
+        """ Returns the last value of the current blockchain. """
+        if len(self.__chain) < 1:
+            return None
+        return self.__chain[-1]
+
+    # One required argument (transaction_amount) and another optional one
+    # (last_transaction)
+    # The optional one is optional because it has a default value => [1]
+
+    def add_transaction(self,
+                        recipient,
+                        sender,
+                        signature,
+                        amount=1.0,
+                        is_receiving=False):
+        """ Append a new value as well as the last blockchain value to the blockchain.
+
+        Arguments:
+            :sender: The sender of the coins.
+            :recipient: The recipient of the coins.
+            :amount: The amount of coins sent with the transaction
+            (default = 1.0)
+        """
+
+        transaction = Transaction(sender, recipient, signature, amount)
+        if Verification.verify_transaction(transaction, self.get_balance):
+            self.__open_transactions.append(transaction)
+            self.save_data()
+            if not is_receiving:
+                for node in self.__peer_nodes:
+                    url = 'http://{}/broadcast-transaction'.format(node)
+                    try:
+                        response = requests.post(url,
+                                                 json={
+                                                     'sender': sender,
+                                                     'recipient': recipient,
+                                                     'amount': amount,
+                                                     'signature': signature
+                                                 })
+                        if (response.status_code == 400 or
+                                response.status_code == 500):
+                            print('Transaction declined, needs resolving')
+                            return False
+                    except requests.exceptions.ConnectionError:
+                        continue
+            return True
+        return False
+
+    def mine_block(self):
+        """Create a new block and add open transactions to it."""
+        if self.public_key is None:
+            return None
+        last_block = self.__chain[-1]
+        hashed_block = hash_block(last_block)
+        proof = self.proof_of_work()
+
+        reward_transaction = Transaction(
+            'MINING', self.public_key, '', MINING_REWARD)
+        # Copy transaction instead of manipulating the original
+        # open_transactions list
+        # This ensures that if for some reason the mining should fail,
+        # we don't have the reward transaction stored in the open transactions
+        copied_transactions = self.__open_transactions[:]
+        for transaction in copied_transactions:
+            if not Wallet.verify_transaction(transaction):
+                return None
+        copied_transactions.append(reward_transaction)
+        block = Block(len(self.__chain), hashed_block,
+                      copied_transactions, proof)
+        self.__chain.append(block)
+        self.__open_transactions = []
+        self.save_data()
+        for node in self.__peer_nodes:
+            url = 'http://{}/broadcast-block'.format(node)
+            converted_block = block.__dict__.copy()
+            converted_block['transactions'] = [
+                transaction.__dict__ for transaction in converted_block['transactions']]
+            try:
+                response = requests.post(url, json={'block': converted_block})
+                if response.status_code == 400 or response.status_code == 500:
+                    print('Block declined, needs resolving')
+                if response.status_code == 409:
+                    self.resolve_conflicts = True
+            except requests.exceptions.ConnectionError:
+                continue
+        return block
+
+    def add_block(self, block):
+        """Add a block which was received via broadcasting to the localb
+        lockchain."""
+        transactions = [Transaction(
+            transaction['sender'],
+            transaction['recipient'],
+            transaction['signature'],
+            transaction['amount']) for transaction in block['transactions']]
+
+        proof_is_valid = Verification.valid_proof(
+            transactions[:-1], block['previous_hash'], block['proof'])
+
+        hashes_match = hash_block(self.chain[-1]) == block['previous_hash']
+        if not proof_is_valid or not hashes_match:
+            return False
+
+        converted_block = Block(
+            block['index'],
+            block['previous_hash'],
+            transactions,
+            block['proof'],
+            block['timestamp'])
+        self.__chain.append(converted_block)
+        stored_transactions = self.__open_transactions[:]
+        # Check which open transactions were included in the received block
+        # and remove them
+
+        for itransaction in block['transactions']:
+            for open_transaction in stored_transactions:
+                if (open_transaction.sender == itransaction['sender'] and
+                        open_transaction.recipient == itransaction['recipient'] and
+                        open_transaction.amount == itransaction['amount'] and
+                        open_transaction.signature == itransaction['signature']):
+                    try:
+                        self.__open_transactions.remove(open_transaction)
+                    except ValueError:
+                        print('Item was already removed')
+        self.save_data()
+        return True
+
+    def resolve(self):
+        """Checks all peer nodes' blockchains and replaces the local one with
+        longer valid ones."""
+        # Initialize the 'winner' chain with the local chain
+        winner_chain = self.chain
+        replace = False
+        for node in self.__peer_nodes:
+            url = 'http://{}/chain'.format(node)
+            try:
+                response = requests.get(url)
+                node_chain = response.json()
+                # Convert the dictionary list to a list of block and
+                # transaction objects
+                node_chain = [
+                    Block(block['index'],
+                          block['previous_hash'],
+                          [
+                        Transaction(
+                            transaction['sender'],
+                            transaction['recipient'],
+                            transaction['signature'],
+                            transaction['amount']) for transaction in block['transactions']
+                    ],
+                        block['proof'],
+                        block['timestamp']) for block in node_chain
+                ]
+                node_chain_length = len(node_chain)
+                local_chain_length = len(winner_chain)
+
+                if (node_chain_length > local_chain_length and
+                        Verification.verify_chain(node_chain)):
+                    winner_chain = node_chain
+                    replace = True
+            except requests.exceptions.ConnectionError:
+                continue
+        self.resolve_conflicts = False
+
+        self.chain = winner_chain
+        if replace:
+            self.__open_transactions = []
+        self.save_data()
+        return replace
+
+    def add_peer_node(self, node):
+        """Adds a new node to the peer node set.
+
+        Arguments:
+            :node: The node URL which should be added.
+        """
+        self.__peer_nodes.add(node)
+        self.save_data()
+
+    def remove_peer_node(self, node):
+        """Removes a node from the peer node set.
+
+        Arguments:
+            :node: The node URL which should be removed.
+        """
+        self.__peer_nodes.discard(node)
+        self.save_data()
+
+    def get_peer_nodes(self):
+        """Return a list of all connected peer nodes."""
+        return list(self.__peer_nodes)
