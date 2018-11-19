@@ -143,8 +143,13 @@ class Blockchain:
         # lists are returned if the person was NOT the sender)
         # This fetches sent amounts of transactions that were already included
         # in blocks of the blockchain
-        transaction_sender = [[transaction.amount for transaction in block.transactions
-                      if transaction.sender == participant] for block in self.__chain]
+        transaction_sender = [
+                 [
+                    transaction.amount for transaction in block.transactions
+                    if transaction.sender == participant
+                 ] for block in self.__chain
+        ]
+
         # Fetch a list of all sent coin amounts for the given person (empty
         # lists are returned if the person was NOT the sender)
         # This fetches sent amounts of open transactions (to avoid double

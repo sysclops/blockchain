@@ -1,6 +1,6 @@
 """Provides verification helper methods."""
 
-from utility.hash_util import hash_string_256, hash_block
+from utility.hashutility import hash_string_256, hash_block
 from wallet import Wallet
 
 
@@ -19,7 +19,7 @@ class Verification:
             current block.
             :proof: The proof number we're testing.
         """
-        guess = (str([tx.to_ordered_dict() for tx in transactions]
+        guess = (str([transaction.to_ordered_dict() for transaction in transactions]
                      ) + str(last_hash) + str(proof)).encode()
         # Only used for the proof-of-work algorithm.
         guess_hash = hash_string_256(guess)
@@ -58,5 +58,5 @@ class Verification:
     @classmethod
     def verify_transactions(cls, open_transactions, get_balance):
         """Verifies all open transactions."""
-        return all([cls.verify_transaction(tx, get_balance, False)
-                    for tx in open_transactions])
+        return all([cls.verify_transaction(transaction, get_balance, False)
+                    for transaction in open_transactions])

@@ -26,7 +26,7 @@ def create_keys():
         blockchain = Blockchain(wallet.public_key, port)
         response = {
             'public_key': wallet.public_key,
-            'private_key': wallet.private_key,
+            'private_key': 'Saved.',
             'funds': blockchain.get_balance()
         }
         return jsonify(response), 201
@@ -44,7 +44,7 @@ def load_keys():
         blockchain = Blockchain(wallet.public_key, port)
         response = {
             'public_key': wallet.public_key,
-            'private_key': wallet.private_key,
+            'private_key': 'Loaded.',
             'funds': blockchain.get_balance()
         }
         return jsonify(response), 201

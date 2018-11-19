@@ -243,7 +243,7 @@
                     axios.post('/wallet')
                         .then(function (response) {
                             vm.error = null;
-                            vm.success = 'Created Wallet! Public Key: ' + response.data.public_key + ', Private Key: ' + response.data.private_key;
+                            vm.success = 'Created Wallet! Public Key: ' + response.data.public_key + ', Your private key was stored in a file and has been saved.';
                             vm.wallet = {
                                 public_key: response.data.public_key,
                                 private_key: response.data.private_key
@@ -265,7 +265,7 @@
                     axios.get('/wallet')
                         .then(function (response) {
                             vm.error = null;
-                            vm.success = 'Created Wallet! Public Key: ' + response.data.public_key + ', Private Key: ' + response.data.private_key;
+                            vm.success = 'Loaded Wallet! Public Key: ' + response.data.public_key;
                             vm.wallet = {
                                 public_key: response.data.public_key,
                                 private_key: response.data.private_key
