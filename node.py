@@ -278,8 +278,10 @@ if __name__ == '__main__':
     from argparse import ArgumentParser
     parser = ArgumentParser()
     parser.add_argument('-p', '--port', type=int, default=5000)
+    parser.add_argument('-a', '--host', type=str, default='0.0.0.0')
     args = parser.parse_args()
     port = args.port
+    host = args.host
     wallet = Wallet(port)
     blockchain = Blockchain(wallet.public_key, port)
-    app.run(host='0.0.0.0', port=port)
+    app.run(host=host, port=port)

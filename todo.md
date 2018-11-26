@@ -5,7 +5,6 @@
 	connected nodes.
 * Increase difficulty dynamically (every 100 blocks)
 * Merkle tree for Transaction Validation (Check previous lecture)
-* Set up a required packages file
 * Fix security when storing private key (Encrypted file)
 * Terminal based wallet(Python Programming/Creating Python Programs |
 	Wikibooks)
