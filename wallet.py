@@ -26,7 +26,7 @@ class Wallet:
             try:
                 with open('wallet-{}.txt'.format(self.node_id), mode='w') as f:
                     f.write(self.public_key)
-                    f.write('\n\n')
+                    f.write('\n')
                     f.write(self.private_key)
                 return True
             except (IOError, IndexError):
