@@ -3,7 +3,7 @@ from Crypto.Signature import PKCS1_v1_5
 from Crypto.Hash import SHA256
 import Crypto.Random
 import binascii
-
+import time
 
 class Wallet:
     """Creates, loads and holds private and public keys. Manages transaction
@@ -26,7 +26,7 @@ class Wallet:
             try:
                 with open('wallet-{}.txt'.format(self.node_id), mode='w') as f:
                     f.write(self.public_key)
-                    f.write('\n')
+                    f.write('\n\n')
                     f.write(self.private_key)
                 return True
             except (IOError, IndexError):
