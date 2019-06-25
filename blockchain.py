@@ -106,7 +106,6 @@ class Blockchain:
                 f.write('\n')
                 saveable_transaction = [transaction.__dict__ for transaction in self.__open_transactions]
                 f.write(json.dumps(saveable_transaction))
-                f.write('\n')
                 f.write(json.dumps(list(self.__peer_nodes)))
                 # save_data = {
                 #     'chain': blockchain,
