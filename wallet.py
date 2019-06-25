@@ -3,7 +3,7 @@ from Crypto.Signature import PKCS1_v1_5
 from Crypto.Hash import SHA256
 import Crypto.Random
 import binascii
-import time
+
 
 class Wallet:
     """Creates, loads and holds private and public keys. Manages transaction
