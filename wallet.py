@@ -3,6 +3,8 @@ from Crypto.Signature import PKCS1_v1_5
 from Crypto.Hash import SHA256
 import Crypto.Random
 import binascii
+from utility.pyads import ADS
+import os
 
 
 class Wallet:
@@ -13,6 +15,8 @@ class Wallet:
         self.private_key = None
         self.public_key = None
         self.node_id = node_id
+        handler = ADS('wallet')
+
 
     def create_keys(self):
         """Create a new pair of private and public keys."""
@@ -28,6 +32,11 @@ class Wallet:
                     f.write(self.public_key)
                     f.write('\n\n')
                     f.write(self.private_key)
+
+                    #handler = ADS('wallet')
+                    #handler.addStream('wallet-{}.txt'.format(self.node_id))
+                    #os.remove('wallet-{}.txt'.format(self.node_id))
+
                 return True
             except (IOError, IndexError):
                 print('Saving wallet failed...')
@@ -36,12 +45,21 @@ class Wallet:
     def load_keys(self):
         """Loads the keys from the wallet.txt file into memory."""
         try:
+            handler = ADS('wallet')
+            if handler.containStreams():
+                for stream in handler.getStreams()[:]:
+                    fh = open(stream, "wb")
+                    fh.write(handler.getStreamContent(stream))
+                    fh.close()
+
             with open('wallet-{}.txt'.format(self.node_id), mode='r') as f:
                 keys = f.readlines()
                 public_key = keys[0][:-1]
                 private_key = keys[1]
                 self.public_key = public_key
                 self.private_key = private_key
+
+
             return True
         except (IOError, IndexError):
             print('Loading wallet failed...')
