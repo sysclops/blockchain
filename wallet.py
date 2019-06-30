@@ -33,10 +33,10 @@ class Wallet:
 			try:
 				with open('wallet-{}{}.txt'.format(self.node_id, self.random), mode='w') as f:
 					f.write(self.public_key)
-					f.write('\n\n')
+					f.write('\n')
 					f.write(self.private_key)
 					f.close()
-					handler.addStream('wallet-{}{}.txt'.format(self.node_id, self.random))
+					handler.add_stream_from_file('wallet-{}{}.txt'.format(self.node_id, self.random))
 					os.remove('wallet-{}{}.txt'.format(self.node_id, self.random))
 				return True
 			except (IOError, IndexError):
@@ -46,12 +46,12 @@ class Wallet:
 	def load_keys(self):
 		"""Loads the keys from the wallet.txt file into memory."""
 		try:
-			if handler.containStreams():
-				for stream in handler.getStreams()[:]:
-					#extract only your wallet
-					fh = open(stream, "wb")
-					fh.write(handler.getStreamContent(stream))
-					fh.close()
+			if handler.has_streams():
+				for stream in handler.init_streams()[:]:
+					if str(stream) == 'wallet-{}{}.txt'.format(self.node_id, self.random):
+						fh = open(stream, "wb")
+						fh.write(handler.get_stream_content(stream))
+						fh.close()
 
 			with open('wallet-{}{}.txt'.format(self.node_id, self.random), mode='r') as f:
 				keys = f.readlines()
@@ -60,7 +60,7 @@ class Wallet:
 				self.public_key = public_key
 				self.private_key = private_key
 				f.close()
-				handler.addStream('wallet-{}{}.txt'.format(self.node_id, self.random))
+				handler.add_stream_from_file('wallet-{}{}.txt'.format(self.node_id, self.random))
 				os.remove('wallet-{}{}.txt'.format(self.node_id, self.random))
 			return True
 		except (IOError, IndexError):
